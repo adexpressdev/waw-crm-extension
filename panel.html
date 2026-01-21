@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Sheet Data</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="header-container">
+      <h3>AdExpress Side CRM</h3>
+
+      <div class="controls-line">
+        <div id="multi-status-indicator"></div>
+
+        <div class="header-controls">
+          <select
+            id="month-filter"
+            class="header-dropdown"
+            style="display: none"
+          >
+            <option value="all">All Months</option>
+            <option value="0">January</option>
+            <option value="1">February</option>
+            <option value="2">March</option>
+            <option value="3">April</option>
+            <option value="4">May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7">August</option>
+            <option value="8">September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+            <option value="11">December</option>
+          </select>
+
+          <select
+            id="status-filter"
+            class="header-dropdown"
+            style="display: none"
+          >
+            <option value="all">All Statuses</option>
+            <option value="unchanged" style="color: #ffc700">
+              Urgent (36h+)!!
+            </option>
+          </select>
+
+          <button id="group-view-btn" title="Group by Status">
+            <span id="group-btn-icon-chart">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                width="20px"
+                height="20px"
+              >
+                <path
+                  d="M16,11V3H8v8H16z M16,21V13H8v8H16z M7,21H2V3h5V21z M22,21h-5V3h5V21z"
+                />
+              </svg>
+            </span>
+            <span id="group-btn-icon-back" style="display: none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                width="20px"
+                height="20px"
+              >
+                <path
+                  d="M11.67,3.87L9.9,2.1L0,12l9.9,9.9l1.77-1.77L3.54,12L11.67,3.87z"
+                />
+              </svg>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="status">Click a WhatsApp chat to see contact details here.</div>
+    <div id="data-container"></div>
+    <div id="grouped-data-container"></div>
+
+    <script src="config.js"></script>
+    <script src="panel.js"></script>
+  </body>
+</html>

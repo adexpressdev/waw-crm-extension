@@ -1,0 +1,440 @@
+/* ---Style.CSS file---- Global Styles & Dark Theme Body --- */
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  padding: 0;
+  margin: 0;
+  /* Main "WhatsApp Green" Dark Background */
+  background-color: #0d1418;
+  /* Primary text color for dark mode */
+  color: #e1e3e5;
+  overflow-y: auto;
+}
+
+/* --- Panel Header --- */
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #1f2c33; /* Darker header for contrast */
+  padding: 12px 15px; /* Adjust padding for the new look */
+  border-bottom: 1px solid #2a2f32;
+  flex-direction: column; /* Stack items vertically */
+  gap: 12px; /* Adds nice spacing between title and controls */
+  /* make the header stick while the page scrolls */
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+h3 {
+  background-color: transparent;
+  color: #e1e3e5;
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+/* --- Top-right Button (Group/Back) --- */
+#group-view-btn {
+  background: #2a2f32;
+  color: #e1e3e5;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute; /* <-- ADD THIS LINE */
+  top: 22px; /* <-- ADD THIS LINE */
+  right: 15px; /* <-- ADD THIS LINE */
+}
+#group-view-btn:hover {
+  background-color: #3a3f42;
+}
+#group-view-btn svg {
+  display: block;
+}
+
+/* --- Status & Loading Text --- */
+#status {
+  color: #8d9499; /* Dimmer text for status messages */
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+/* --- Main View for Details --- */
+.details-view {
+  text-align: left;
+  padding: 0 15px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* --- Individual Data "Box" --- */
+.detail-item {
+  background-color: #1f2c33; /* Card background color */
+  border: 1px solid #2a2f32;
+  border-radius: 8px;
+  padding: 12px;
+  transition: border-color 0.2s ease-in-out;
+}
+.detail-item:hover {
+  border-color: #3a3f42;
+}
+
+/* --- Field Label (e.g., "Name", "Status") --- */
+.detail-item strong {
+  font-weight: 600;
+  font-size: 13px;
+  color: #00a884; /* Bright WhatsApp Green for labels */
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* --- Column-Specific Colors --- */
+.detail-item {
+  border-left: 3px solid #2a2f32; /* Default left border */
+  padding-left: 9px;
+}
+
+/* --- NEW CUSTOM STATUS COLORS --- */
+.status-waiting-for-approval {
+  border-left-color: #77d762;
+  background-color: hsl(107, 39%, 21%);
+}
+.status-script-written {
+  border-left-color: #8ed0ff;
+  background-color: hsl(208, 64%, 35%);
+}
+.status-jelani-voice,
+.status-anas-voice {
+  border-left-color: hsl(291, 85%, 18%);
+  background-color: #67456d;
+}
+.status-tinni-voice {
+  border-left-color: #ffb3c1;
+  background-color: hsl(298, 93%, 89%);
+}
+.status-closed {
+  border-left-color: #ffc700;
+  background-color: hsl(44, 77%, 27%);
+}
+.status-bill-due {
+  border-left-color: #ff5c5c;
+  background-color: hsl(0, 64%, 51%);
+}
+.status-code-pending {
+  border-left-color: #9775fa;
+  background-color: hsl(258, 91%, 22%);
+}
+.status-correction {
+  border-left-color: #ffb5a7;
+  background-color: hsl(9, 33%, 18%);
+}
+
+.bg-off-white {
+  background-color: #2c3135;
+  border-left-color: #adb5bd;
+}
+.bg-light-purple {
+  background-color: hsl(258, 33%, 18%);
+  border-left-color: #9775fa;
+}
+.bg-light-green {
+  background-color: hsl(108, 33%, 18%);
+  border-left-color: #77d762;
+}
+.bg-light-blue {
+  background-color: hsl(207, 33%, 18%);
+  border-left-color: #57a5de;
+}
+.bg-light-red {
+  background-color: hsl(0, 33%, 18%);
+  border-left-color: #ff5c5c;
+}
+
+/* --- FORM ELEMENT STYLING (Editable Text & Dropdowns) --- */
+.detail-item p,
+.detail-item select {
+  margin: 0;
+  font-size: 15px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3f42;
+  color: #e1e3e5;
+  background-color: #2a2f32;
+  width: 100%;
+  box-sizing: border-box;
+}
+.detail-item p[contenteditable="true"] {
+  background-color: #3a3f42;
+  border-color: #00a884;
+  outline: none;
+}
+.detail-item select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5z%22%20fill%3D%22%23cccccc%22/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px top 50%;
+}
+.detail-item select:focus {
+  border-color: #00a884;
+  outline: none;
+}
+
+/* --- Save Button --- */
+.save-btn {
+  display: none;
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background-color: #00a884;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+}
+.save-btn:hover {
+  background-color: #008069;
+}
+.save-btn.visible {
+  display: inline-block;
+}
+
+/* --- Grouped View Styling --- */
+#grouped-data-container {
+  padding: 0 15px 20px;
+}
+.status-group {
+  margin-bottom: 20px;
+}
+.status-group-header {
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px;
+  background-color: #2a2f32;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.grouped-contact-item {
+  font-size: 14px;
+  padding: 8px 10px;
+  background-color: #1f2c33;
+  border: 1px solid #2a2f32;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.grouped-contact-item:hover {
+  background-color: #2a2f32;
+}
+
+/* --- Iframe container on WhatsApp Page --- */
+#sheet-viewer-iframe {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid #2a2f32;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+  z-index: 99999;
+  background-color: #0d1418;
+}
+
+/* --- NEW: Multiple Match List View Styling --- */
+.multiple-matches-container {
+  padding: 0 15px 20px;
+}
+.match-item {
+  background-color: #1f2c33;
+  border: 1px solid #2a2f32;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.match-item-header {
+  font-weight: bold;
+  color: #00a884;
+  margin-bottom: 8px;
+}
+.match-item-details {
+  font-size: 14px;
+  color: #e1e3e5;
+}
+.match-item-divider {
+  border: 0;
+  height: 1px;
+  background-color: #3a3f42;
+  margin: 25px 0;
+}
+
+/* --- these new styles to your existing style.css --- */
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Adds space between the filter and the button */
+}
+
+.header-dropdown {
+  background-color: #2a2f32;
+  color: #e1e3e5;
+  border: 1px solid #3a3f42;
+  border-radius: 18px; /* Makes it pill-shaped */
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5z%22%20fill%3D%22%23cccccc%22/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px top 50%;
+  padding-right: 28px; /* Make room for the arrow */
+  max-width: 140px; /* Prevents the dropdown from becoming too wide */
+  white-space: nowrap; /* Keeps the text on a single line */
+  overflow: hidden; /* Hides any text that overflows the max-width */
+  text-overflow: ellipsis; /* Shows "..." for overflowed text */
+}
+
+.header-dropdown:focus {
+  outline: none;
+  border-color: #00a884;
+}
+
+/* ---THIS ENTIRE BLOCK FOR FILTER COLORING --- */
+
+/* When a status class is applied to a dropdown, change its appearance */
+.header-dropdown.status-script-written {
+  background-color: hsl(207, 33%, 18%);
+  border-color: #57a5de;
+}
+.header-dropdown.status-jelani-voice,
+.header-dropdown.status-anas-voice {
+  background-color: #2c3135;
+  border-color: #adb5bd;
+}
+.header-dropdown.status-tinni-voice {
+  background-color: hsl(348, 33%, 18%);
+  border-color: #ffb3c1;
+}
+.header-dropdown.status-closed {
+  background-color: hsl(45, 33%, 18%);
+  border-color: #ffc700;
+}
+.header-dropdown.status-bill-due {
+  /* Covers 'Customer cancel this' */
+  background-color: hsl(0, 33%, 18%);
+  border-color: #ff5c5c;
+}
+.header-dropdown.status-code-pending {
+  background-color: hsl(258, 33%, 18%);
+  border-color: #9775fa;
+}
+.header-dropdown.status-correction {
+  background-color: hsl(9, 33%, 18%);
+  border-color: #ffb5a7;
+}
+
+/* A default style for when "All Statuses" is selected */
+.header-dropdown.status-all {
+  background-color: #2a2f32;
+  border-color: #3a3f42;
+}
+
+/* --- NEW: Header Title & Status Circles --- */
+
+/* --- Adjust Header Styles --- */
+
+/* This will now center your "AdExpress Customer Data" title */
+.header-container h3 {
+  text-align: center;
+}
+
+/* This new rule styles the second line of the header */
+.controls-line {
+  display: flex;
+  justify-content: space-between; /* Pushes children to opposite ends */
+  align-items: center;
+  width: 100%;
+}
+
+/* Ensure the status indicator has a minimum height even when empty */
+#multi-status-indicator {
+  min-height: 36px; /* Matches the height of the control buttons */
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+/* This container holds all the little circles */
+#multi-status-indicator {
+  display: flex; /* Makes circles sit side-by-side */
+  gap: 5px; /* Space between each circle */
+}
+
+/* Base style for a single circle */
+.status-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+}
+
+.status-circle:hover {
+  transform: scale(1.25); /* A nice little zoom effect on hover */
+}
+
+/* Colors for each status circle, matching your theme */
+.status-circle.status-waiting-for-approval {
+  background-color: #77d762;
+}
+.status-circle.status-script-written {
+  background-color: #8ed0ff;
+}
+.status-circle.status-anas-voice {
+  background-color: #aa75f1;
+} /* Covers Jelane, Anas, Rashed, Rose */
+.status-circle.status-tinni-voice {
+  background-color: #ff8fab;
+} /* Covers Tinni, Mawa */
+.status-circle.status-closed {
+  background-color: #ffc700;
+}
+.status-circle.status-bill-due {
+  background-color: #ff5c5c;
+} /* Covers Bill due, Customer cancel */
+.status-circle.status-code-pending {
+  background-color: #9775fa;
+}
+.status-circle.status-correction {
+  background-color: #ffb5a7;
+}
+
+/* A default color for circles with no status or an unknown one */
+.status-circle.status-uncategorized {
+  background-color: #4a545c;
+}
+
+/* Style for the selected contact in the group view list */
+.grouped-contact-item.selected-contact {
+  background-color: #005c4b; /* A darker WhatsApp green for selection */
+  color: #ffffff;
+  border: 1px solid #00a884; /* A brighter green border to make it stand out */
+  font-weight: 600;
+}

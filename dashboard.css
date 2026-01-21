@@ -1,0 +1,237 @@
+/* === DASHBOARD CSS - FINAL CORRECTED VERSION === */
+
+/* --- Google Font --- */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap");
+
+/* --- CSS Variables for Easy Theming --- */
+:root {
+  --bg-color: #0f172a; /* Deeper space blue */
+  --card-bg: rgba(30, 41, 59, 0.5); /* Semi-transparent for glass effect */
+  --text-color: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: rgba(51, 65, 85, 0.5);
+  --glow-color: rgba(59, 130, 246, 0.5);
+
+  /* Status-specific colors */
+  --level-normal-color: #3b82f6; /* Blue */
+  --level-warning-color: #f59e0b; /* Amber */
+  --level-critical-color: #ef4444; /* Red */
+}
+
+/* --- General Page & Background Styling --- */
+body {
+  font-family: "Inter", sans-serif;
+  background-color: var(--bg-color);
+  background-image:
+    radial-gradient(circle at 1% 1%, rgba(59, 130, 246, 0.15), transparent 30%),
+    radial-gradient(circle at 99% 99%, rgba(239, 68, 68, 0.15), transparent 40%);
+  color: var(--text-color);
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+}
+
+/* --- Header & Footer --- */
+header h1 {
+  font-weight: 900;
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -1px;
+}
+
+header p,
+footer {
+  color: var(--text-muted);
+  font-weight: 300;
+  font-size: 1.1rem;
+}
+
+/* --- Dashboard Grid Layout --- */
+#dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+  padding: 3rem 0;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* * --- CORRECTED STATUS CARD STYLING ---
+ * The animation properties are now defined in the @keyframes rule,
+ * and only the 'animation' property is needed here.
+*/
+.status-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  text-align: left;
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+
+  /* This is the corrected animation call. It references the keyframes below. */
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+/* --- Typography inside the card --- */
+.status-count {
+  font-size: 4.5rem;
+  font-weight: 900;
+  line-height: 1;
+  margin: 0;
+  text-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.status-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-color);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* --- Color Levels & Hover Effects --- */
+.level-normal {
+  border-left: 5px solid var(--level-normal-color);
+}
+.level-warning {
+  border-left: 5px solid var(--level-warning-color);
+}
+.level-critical {
+  border-left: 5px solid var(--level-critical-color);
+}
+
+.level-normal:hover {
+  box-shadow: 0 0 20px var(--glow-color);
+}
+.level-warning:hover {
+  box-shadow: 0 0 20px var(--level-warning-color);
+}
+.level-critical:hover {
+  box-shadow: 0 0 25px var(--level-critical-color);
+}
+
+.level-warning .status-count {
+  color: var(--level-warning-color);
+}
+.level-critical .status-count {
+  color: var(--level-critical-color);
+}
+
+/* --- Blinking Animations for All Levels --- */
+.blinking-critical {
+  animation: pulse-critical 1.5s infinite ease-in-out;
+}
+@keyframes pulse-critical {
+  0% {
+    border-color: var(--level-critical-color);
+  }
+  50% {
+    border-color: var(--border-color);
+  }
+  100% {
+    border-color: var(--level-critical-color);
+  }
+}
+
+.blinking-warning {
+  animation: pulse-warning 2.5s infinite ease-in-out;
+}
+@keyframes pulse-warning {
+  0% {
+    border-color: var(--level-warning-color);
+  }
+  50% {
+    border-color: var(--border-color);
+  }
+  100% {
+    border-color: var(--level-warning-color);
+  }
+}
+
+.blinking-normal {
+  animation: pulse-normal 4s infinite ease-in-out;
+}
+@keyframes pulse-normal {
+  0% {
+    border-color: var(--level-normal-color);
+  }
+  50% {
+    border-color: var(--border-color);
+  }
+  100% {
+    border-color: var(--level-normal-color);
+  }
+}
+
+/* * --- CORRECTED FADE-IN ANIMATION ---
+ * This version is more robust. It defines both the start (from) and end (to) states.
+*/
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Loader Styling --- */
+#loader {
+  padding-top: 5rem;
+}
+.spinner {
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--level-normal-color);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- ADD THIS ENTIRE BLOCK TO THE END OF YOUR CSS --- */
+
+/* --- Special Styling for the Urgent "Unchanged" Card --- */
+.unchanged-card {
+  /* This makes the card span the full width of the grid */
+  grid-column: 1 / -1;
+  text-align: center;
+
+  /* Make the font sizes larger to fill the space */
+  & .status-count {
+    font-size: 5.5rem;
+  }
+
+  & .status-name {
+    font-size: 1.2rem;
+    border-top: none; /* Remove the top border for a cleaner look */
+    margin-top: 0;
+  }
+
+  /* Give it a unique, urgent background */
+  background: radial-gradient(
+    ellipse at center,
+    hsl(0, 72%, 25%),
+    var(--bg-color) 80%
+  );
+  border-width: 2px;
+}

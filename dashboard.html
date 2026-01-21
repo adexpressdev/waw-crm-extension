@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Status Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <header>
+      <h1>AdExpress Status Dashboard</h1>
+      <p>Live counts from Google Sheet</p>
+    </header>
+
+    <main id="dashboard-grid"></main>
+
+    <div id="loader">
+      <div class="spinner"></div>
+      <p>Loading Latest Data...</p>
+    </div>
+
+    <footer>Last updated: <span id="last-updated"></span></footer>
+
+    <script src="dashboard.js"></script>
+  </body>
+</html>
