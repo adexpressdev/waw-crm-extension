@@ -19,9 +19,12 @@ const _isVisible = (el) => {
  */
 function _extractFromDataAttrs() {
   console.log('[CRM] Step: Trying _extractFromDataAttrs');
-  const root = document.querySelector('#main');
+  // Try multiple selectors for the main chat area
+  const root = document.querySelector('#main') || 
+               document.querySelector('[data-testid="conversation-panel"]') ||
+               document.querySelector('div[tabindex="-1"][data-tab]');
   if (!root || !_isVisible(root)) {
-    console.log('[CRM] Step: No visible #main root found');
+    console.log('[CRM] Step: No visible main chat root found');
     return null;
   }
   const selectors = [
@@ -134,6 +137,108 @@ function _extractFromHeaderAria() {
     }
   }
   console.log('[CRM] Step: No number found in header aria');
+  return null;
+}
+
+/**
+ * Extracts phone from subtitle/secondary text below contact name
+ * (When contact is saved, WhatsApp shows name on top and phone number below)
+ * Uses optimized approach: target specific selectors + BD phone regex
+ */
+function _extractFromHeaderSubtitle() {
+  console.log('[CRM] Step: Trying _extractFromHeaderSubtitle');
+  
+  // Try multiple container selectors - phone can be in header or section
+  const containers = [
+    document.querySelector('#main header'),
+    document.querySelector('#main section'),
+    document.querySelector('[data-testid="conversation-header"]'),
+    document.querySelector('[data-testid="conversation-info-header"]'),
+    document.querySelector('#main')  // Fallback to entire main area
+  ].filter(Boolean);
+
+  if (!containers.length) {
+    console.log('[CRM] Step: No container found');
+    return null;
+  }
+
+  for (const container of containers) {
+    if (!_isVisible(container)) continue;
+    
+    console.log(`[CRM] Step: Checking container ${container.tagName || 'unknown'}`);
+    
+    // PRIORITY 1: Target selectable-text and copyable-text (WhatsApp's standard for phone numbers)
+    const prioritySelectors = [
+      '[data-testid="selectable-text"].copyable-text',
+      'span.copyable-text[data-testid="selectable-text"]',
+      '.copyable-text._ao3e._aupe',
+      'span.copyable-text'
+    ];
+    
+    for (const selector of prioritySelectors) {
+      const elements = container.querySelectorAll(selector);
+      console.log(`[CRM] Step: Found ${elements.length} elements for selector: ${selector}`);
+      
+      for (const el of elements) {
+        if (!_isVisible(el)) continue;
+        
+        const txt = (el.textContent || '').trim();
+        if (!txt || txt.length < 8) continue;
+        
+        console.log(`[CRM] Step: Checking copyable text: "${txt}"`);
+        
+        // Use the existing BD phone finder
+        const phones = _findBdPhonesInText(txt);
+        if (phones.length > 0) {
+          const chosen = phones[0]; // Take first match
+          console.log(`[CRM] Step: Found BD phone in copyable text: ${chosen}`);
+          return chosen;
+        }
+      }
+    }
+    
+    // PRIORITY 2: Scan spans in divs with class x1evy7pa, x1anpbxc (subtitle area)
+    const subtitleDivs = container.querySelectorAll('div.x1evy7pa.x1anpbxc, div.x1c4vz4f.xs83m0k');
+    console.log(`[CRM] Step: Found ${subtitleDivs.length} subtitle divs`);
+    
+    for (const div of subtitleDivs) {
+      if (!_isVisible(div)) continue;
+      
+      const spans = div.querySelectorAll('span');
+      for (const span of spans) {
+        const txt = (span.textContent || '').trim();
+        if (!txt || txt.length < 8) continue;
+        
+        const phones = _findBdPhonesInText(txt);
+        if (phones.length > 0) {
+          const chosen = phones[0];
+          console.log(`[CRM] Step: Found BD phone in subtitle div span: ${chosen}`);
+          return chosen;
+        }
+      }
+    }
+    
+    // PRIORITY 3: Generic scan with phone-like pattern
+    const allSpans = Array.from(container.querySelectorAll('span')).filter(_isVisible);
+    console.log(`[CRM] Step: Fallback scan of ${allSpans.length} spans`);
+    
+    for (const span of allSpans) {
+      const txt = (span.textContent || '').trim();
+      
+      // Only check text that looks like it could be a phone number
+      if (!txt || txt.length < 8) continue;
+      if (!txt.match(/[\d\+]/)) continue; // Must contain digit or +
+      
+      const phones = _findBdPhonesInText(txt);
+      if (phones.length > 0) {
+        const chosen = phones[0];
+        console.log(`[CRM] Step: Found BD phone in fallback scan: ${chosen} from "${txt}"`);
+        return chosen;
+      }
+    }
+  }
+
+  console.log('[CRM] Step: No phone found in header subtitle');
   return null;
 }
 /**
@@ -250,6 +355,7 @@ function _extractFromLeftPaneSelected() {
 function _findBdPhonesInText(text) {
   if (!text) return [];
   const digits = _onlyDigits(text);
+  console.log(`[CRM] _findBdPhonesInText: input="${text}", digits="${digits}", length=${digits.length}`);
   const out = [];
   const seen = new Set();
 
@@ -258,6 +364,7 @@ function _findBdPhonesInText(text) {
     if (digits.slice(i, i + 4) === '8801' && i + 13 <= digits.length) {
       const d = digits.slice(i, i + 13);
       if (!seen.has(d)) {
+        console.log(`[CRM] _findBdPhonesInText: Found 13-digit BD phone: ${d}`);
         out.push(d);
         seen.add(d);
       }
@@ -268,145 +375,256 @@ function _findBdPhonesInText(text) {
       '3456789'.includes(digits[i + 2])) {
       const d = digits.slice(i, i + 11);
       if (!seen.has(d)) {
+        console.log(`[CRM] _findBdPhonesInText: Found 11-digit BD phone: ${d}`);
         out.push(d);
         seen.add(d);
       }
     }
   }
 
+  console.log(`[CRM] _findBdPhonesInText: returning ${out.length} phone(s):`, out);
   return out;
 }
 
 // 5) Last resort: briefly open Contact Info drawer, read number, close
 
-
-
-async function _extractFromInfoDrawer({ aggressive = false } = {}) {
-  console.log(`[CRM] Step: Trying _extractFromInfoDrawer (aggressive: ${aggressive})`);
-  let drawer =
+/**
+ * Detects if the contact info drawer is currently open.
+ * When open, the drawer container gains classes: x1c4vz4f x2lah0s
+ * and contains a section with the contact details.
+ */
+function _isDrawerOpen() {
+  console.log('[CRM] Step: Checking if drawer is open...');
+  
+  // Primary detection: section with these specific classes inside drawer area
+  const section = document.querySelector('section.x1c4vz4f.x2lah0s');
+  if (section) {
+    console.log('[CRM] Step: Found section.x1c4vz4f.x2lah0s, checking visibility...');
+    if (_isVisible(section)) {
+      console.log('[CRM] Step: Drawer detected via section.x1c4vz4f.x2lah0s');
+      return section;
+    }
+  }
+  
+  // Check for drawer container that has expanded (gained x1c4vz4f x2lah0s classes)
+  // The drawer container is div._aig-._as6h that gains these classes when open
+  const expandedDrawer = document.querySelector('div._aig-._as6h.x1c4vz4f.x2lah0s');
+  if (expandedDrawer && _isVisible(expandedDrawer)) {
+    console.log('[CRM] Step: Drawer detected via div._aig-._as6h.x1c4vz4f.x2lah0s');
+    // Return the section inside if it exists, otherwise the container
+    const innerSection = expandedDrawer.querySelector('section');
+    return innerSection || expandedDrawer;
+  }
+  
+  // Alternative: look for header with "Contact info" title
+  const contactInfoHeader = document.querySelector('header h2');
+  if (contactInfoHeader) {
+    const headerText = contactInfoHeader.textContent || '';
+    if (headerText.includes('Contact info') || headerText.includes('contact info')) {
+      const section = contactInfoHeader.closest('section') || 
+                      contactInfoHeader.closest('div.copyable-area')?.querySelector('section');
+      if (section && _isVisible(section)) {
+        console.log('[CRM] Step: Drawer detected via "Contact info" header');
+        return section;
+      }
+    }
+  }
+  
+  // Look for the copyable-area div that contains contact info
+  const copyableAreas = document.querySelectorAll('div.copyable-area');
+  for (const area of copyableAreas) {
+    // Check if this area has contact info structure (profile image, name, phone subtitle)
+    const hasSubtitle = area.querySelector('div.x1evy7pa.x1anpbxc');
+    const hasCloseBtn = area.querySelector('button[aria-label="Close"]');
+    if (hasSubtitle && hasCloseBtn && _isVisible(area)) {
+      console.log('[CRM] Step: Drawer detected via copyable-area with subtitle and close button');
+      return area;
+    }
+  }
+  
+  // Legacy selectors for older WhatsApp versions
+  const legacyDrawer =
     document.querySelector('[data-testid="conversation-info-drawer"]') ||
     document.querySelector('[data-testid="contact-info"]') ||
     document.querySelector('div[role="dialog"][data-animate-modal="true"]') ||
     document.querySelector('aside[aria-label], [role="region"][aria-label]');
+  
+  if (legacyDrawer && _isVisible(legacyDrawer)) {
+    console.log('[CRM] Step: Drawer detected via legacy selector');
+    return legacyDrawer;
+  }
+  
+  console.log('[CRM] Step: No drawer detected');
+  return null;
+}
+
+/**
+ * Extracts phone number from the open drawer's contact info section.
+ * Targets the specific DOM structure: div.x1evy7pa.x1anpbxc > span.copyable-text
+ */
+function _extractPhoneFromDrawerSection(drawer) {
+  if (!drawer) return null;
+  
+  // PRIMARY: Target the subtitle div that contains phone (div.x1evy7pa.x1anpbxc)
+  const subtitleDivs = drawer.querySelectorAll('div.x1evy7pa.x1anpbxc');
+  console.log(`[CRM] Step: Found ${subtitleDivs.length} subtitle divs in drawer`);
+  
+  for (const div of subtitleDivs) {
+    if (!_isVisible(div)) continue;
+    ` `
+    // Look for copyable-text spans with selectable-text testid
+    const copyableSpans = div.querySelectorAll('span.copyable-text[data-testid="selectable-text"], span._ao3e._aupe.copyable-text');
+    for (const span of copyableSpans) {
+      const txt = (span.textContent || '').trim();
+      console.log(`[CRM] Step: Checking subtitle copyable span: "${txt}"`);
+      
+      const phones = _findBdPhonesInText(txt);
+      if (phones.length > 0) {
+        console.log(`[CRM] Step: Found phone in subtitle: ${phones[0]}`);
+        return phones[0];
+      }
+    }
+    
+    // Also check nested spans
+    const allSpans = div.querySelectorAll('span');
+    for (const span of allSpans) {
+      const txt = (span.textContent || '').trim();
+      if (!txt || txt.length < 8 || !txt.match(/[\d\+]/)) continue;
+      
+      const phones = _findBdPhonesInText(txt);
+      if (phones.length > 0) {
+        console.log(`[CRM] Step: Found phone in subtitle nested span: ${phones[0]}`);
+        return phones[0];
+      }
+    }
+  }
+  
+  // SECONDARY: All copyable-text elements in drawer
+  const allCopyable = drawer.querySelectorAll('[data-testid="selectable-text"].copyable-text, span.copyable-text._ao3e._aupe');
+  console.log(`[CRM] Step: Checking ${allCopyable.length} copyable elements in drawer`);
+  
+  for (const el of allCopyable) {
+    if (!_isVisible(el)) continue;
+    const txt = (el.textContent || '').trim();
+    if (!txt || txt.length < 8) continue;
+    
+    const phones = _findBdPhonesInText(txt);
+    if (phones.length > 0) {
+      console.log(`[CRM] Step: Found phone in drawer copyable: ${phones[0]}`);
+      return phones[0];
+    }
+  }
+  
+  // FALLBACK: Text walker for any phone-like content
+  const walker = document.createTreeWalker(drawer, NodeFilter.SHOW_TEXT, null);
+  let node;
+  const foundPhones = [];
+  
+  while ((node = walker.nextNode())) {
+    if (!node.parentElement || !_isVisible(node.parentElement)) continue;
+    const t = node.nodeValue?.trim();
+    if (!t || t.length < 8 || !t.match(/[\d\+]/)) continue;
+    
+    const phones = _findBdPhonesInText(t);
+    if (phones.length) {
+      console.log('[CRM] Step: drawer text walker -> BD phones:', t, '=>', phones);
+      foundPhones.push(...phones);
+    }
+  }
+  
+  if (foundPhones.length) {
+    console.log(`[CRM] Step: Found ${foundPhones.length} phones via text walker, using first: ${foundPhones[0]}`);
+    return foundPhones[0];
+  }
+  
+  return null;
+}
+
+async function _extractFromInfoDrawer({ aggressive = false } = {}) {
+  console.log(`[CRM] Step: Trying _extractFromInfoDrawer (aggressive: ${aggressive})`);
+  
+  let drawer = _isDrawerOpen();
   let openedHere = false;
 
-  // 1) Open drawer if needed (faster wait)
+  // 1) Open drawer if not already open
   if (!drawer) {
-    console.log('[CRM] Step: No drawer found, attempting to open');
-    const headerClickable =
-      document.querySelector('#main header [role="button"]') ||
-      document.querySelector('#main header') ||
-      document.querySelector('[data-testid="conversation-header"]');
+    console.log('[CRM] Step: Drawer not open, attempting to click header to open');
+    
+    // Try multiple selectors to find clickable header element
+    const headerSelectors = [
+      '#main header [role="button"]',
+      '#main header img[draggable="false"]', // Profile image in header
+      '#main header span[data-testid="conversation-info-header-chat-title"]',
+      '#main header',
+      '[data-testid="conversation-header"]',
+      '[data-testid="conversation-info-header"]'
+    ];
+    
+    let headerClickable = null;
+    for (const sel of headerSelectors) {
+      headerClickable = document.querySelector(sel);
+      if (headerClickable && _isVisible(headerClickable)) {
+        console.log(`[CRM] Step: Found clickable header with: ${sel}`);
+        break;
+      }
+      headerClickable = null;
+    }
+    
     if (!headerClickable) {
-      console.log('[CRM] Step: No header clickable to open drawer');
+      console.log('[CRM] Step: No header clickable found to open drawer');
+      // Debug: log what headers exist
+      const anyHeader = document.querySelector('#main header');
+      if (anyHeader) {
+        console.log(`[CRM] Debug: #main header exists but no clickable found. HTML snippet: ${anyHeader.innerHTML?.slice(0, 200)}`);
+      } else {
+        console.log('[CRM] Debug: #main header does not exist');
+      }
       return null;
     }
+    
+    console.log(`[CRM] Step: Clicking header element: ${headerClickable.tagName}`);
     headerClickable.click();
     openedHere = true;
 
-    // Was 60 spins x 75ms (~4.5s). Now max ~1.5s.
-    const spins = aggressive ? 25 : 12;
+    // Wait for drawer to appear and render (up to ~2s for aggressive, ~1s normal)
+    const spins = aggressive ? 30 : 15;
     for (let i = 0; i < spins; i++) {
-      await _sleep(60);
-      drawer =
-        document.querySelector('[data-testid="conversation-info-drawer"]') ||
-        document.querySelector('[data-testid="contact-info"]') ||
-        document.querySelector('div[role="dialog"][data-animate-modal="true"]') ||
-        document.querySelector('aside[aria-label], [role="region"][aria-label]');
+      await _sleep(70);
+      drawer = _isDrawerOpen();
       if (drawer) {
-        const rect = drawer.getBoundingClientRect();
-        const opacity = parseFloat(getComputedStyle(drawer).opacity || '1');
-        console.log(
-          `[CRM] Drawer rect (attempt ${i + 1}): width=${rect.width}, height=${rect.height}, opacity=${opacity}`
-        );
-        if (rect.width > 10 && rect.height > 10 && opacity > 0.3) {
-          console.log('[CRM] Step: Drawer opened and visible');
-          break;
-        }
+        console.log(`[CRM] Step: Drawer opened on attempt ${i + 1}`);
+        // Give it a moment to fully render content
+        await _sleep(150);
+        break;
       }
     }
   }
 
-  if (!drawer || drawer.getBoundingClientRect().width <= 10) {
+  if (!drawer) {
     console.log('[CRM] Step: Drawer not visible after attempts');
     return null;
   }
 
-  // 2) FAST PATH: "About and phone number" section with copyable text
-  const aboutSection = drawer.querySelector(
-    '.x13mwh8y.x1q3qbx4.x1wg5k15.x3psx0u.xat24cr.x1280gxy.x106a9eq.x1xnnf8n.x889kno.x18d9i69'
-  );
-  if (aboutSection) {
-    console.log('[CRM] Step: Found "About and phone number" section');
-    const phoneEl =
-      aboutSection.querySelector('._ajxt .copyable-text') ||
-      aboutSection.querySelector('.copyable-text.selectable-text');
-    if (phoneEl) {
-      const txt = (phoneEl.innerText || phoneEl.textContent || '').trim();
-      const phones = _findBdPhonesInText(txt);
-      if (phones.length) {
-        const chosen = phones[phones.length - 1]; // keep same heuristic
-        console.log('[CRM] Step: Phones in about section:', phones, 'chosen:', chosen);
-        if (openedHere) {
-          console.log('[CRM] Step: Closing drawer (opened here)');
-          (
-            document.querySelector('button[aria-label="Close"]') ||
-            document.querySelector('[data-testid="x-view"]') ||
-            document.querySelector('button[aria-label="Back"]')
-          )?.click();
-        }
-        return chosen;
-      }
-    }
-    console.log('[CRM] Step: No copyable-text phone in about section');
-  } else {
-    console.log('[CRM] Step: No "About and phone number" section found');
-  }
-
-  // 3) FALLBACK: text scan in narrowed scope using the same BD parser
-  const anchor = Array.from(drawer.querySelectorAll('span, div, h2, h3, [title]'))
-    .filter(_isVisible)
-    .find(el => {
-      const txt = (el.innerText || el.textContent || '').toLowerCase();
-      return /about.*phone/i.test(txt) || /phone number/i.test(txt) || /whatsapp/i.test(txt);
-    });
-
-  const scope =
-    (anchor && _isVisible(anchor) && anchor.closest('[tabindex], [role="region"], section, div')) ||
-    drawer;
-  console.log('[CRM] Step: Using fallback scope for text scan');
-
-  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
-  let node;
-  const foundPhones = [];
-
-  while ((node = walker.nextNode())) {
-    if (!node.parentElement || !_isVisible(node.parentElement)) continue;
-    const t = node.nodeValue?.trim();
-    if (!t) continue;
-    const phones = _findBdPhonesInText(t);
-    if (phones.length) {
-      console.log('[CRM] Step: drawer text node -> BD phones:', t, '=>', phones);
-      foundPhones.push(...phones);
-    }
-  }
-
+  // 2) Extract phone from drawer
+  const phone = _extractPhoneFromDrawerSection(drawer);
+  
+  // 3) Close drawer if we opened it
   if (openedHere) {
     console.log('[CRM] Step: Closing drawer (opened here)');
-    (
+    const closeBtn = 
       document.querySelector('button[aria-label="Close"]') ||
       document.querySelector('[data-testid="x-view"]') ||
-      document.querySelector('button[aria-label="Back"]')
-    )?.click();
+      document.querySelector('button[aria-label="Back"]') ||
+      drawer.querySelector('button[type="button"]'); // Close button in header
+    closeBtn?.click();
   }
 
-  if (foundPhones.length) {
-    const chosen = foundPhones[foundPhones.length - 1];
-    console.log('[CRM] Step: Found in drawer text scan, chosen:', chosen, 'all:', foundPhones);
-    return chosen;
+  if (phone) {
+    console.log(`[CRM] Step: Extracted from drawer: ${phone}`);
+    return phone;
   }
 
-  console.log('[CRM] Step: No number found in drawer text scan');
+  console.log('[CRM] Step: No phone found in drawer');
   return null;
 }
 
@@ -415,50 +633,19 @@ async function _extractFromInfoDrawer({ aggressive = false } = {}) {
 function _extractFromDrawerCopyableSpan() {
   console.log('[CRM] Step: Trying _extractFromDrawerCopyableSpan');
 
-  const roots = [
-    document.querySelector('[data-testid="conversation-info-drawer"]'),
-    document.querySelector('[data-testid="contact-info"]'),
-    document.querySelector('div[role="dialog"][data-animate-modal="true"]'),
-    document.querySelector('aside[aria-label], [role="region"][aria-label]')
-  ].filter(Boolean);
-
-  const drawer = roots.find(_isVisible) || document;
-
-  const aboutSection = drawer.querySelector(
-    '.x13mwh8y.x1q3qbx4.x1wg5k15.x3psx0u.xat24cr.x1280gxy.x106a9eq.x1xnnf8n.x889kno.x18d9i69'
-  );
-  let candidates = [];
-
-  if (aboutSection) {
-    console.log('[CRM] Step: Found "About and phone number" section for copyable scan');
-    candidates = Array.from(
-      aboutSection.querySelectorAll('._ajxu .copyable-text, ._ajxt .copyable-text, .copyable-text.selectable-text')
-    ).filter(_isVisible);
+  // Use the improved drawer detection
+  const drawer = _isDrawerOpen();
+  
+  if (!drawer) {
+    console.log('[CRM] Step: Drawer not open for copyable span extraction');
+    return null;
   }
 
-  if (!candidates.length) {
-    console.log('[CRM] Step: Falling back to general copyable-text scan');
-    candidates = Array.from(
-      drawer.querySelectorAll('._ajxu .copyable-text, ._ajxt .copyable-text, .copyable-text.selectable-text')
-    ).filter(_isVisible);
-  }
-
-  const allPhones = [];
-  for (const el of candidates) {
-    const t = (el.innerText || el.textContent || '').trim();
-    if (!t) continue;
-    const phones = _findBdPhonesInText(t);
-    if (phones.length) {
-      console.log('[CRM] Step: copyable span text -> BD phones:', t, '=>', phones);
-      allPhones.push(...phones);
-    }
-  }
-
-  if (allPhones.length) {
-    // Heuristic: choose the last one (often the primary WhatsApp number in these blocks)
-    const chosen = allPhones[allPhones.length - 1];
-    console.log('[CRM] Step: Found in copyable spans, chosen:', chosen, 'all:', allPhones);
-    return chosen;
+  // Use the unified extraction function
+  const phone = _extractPhoneFromDrawerSection(drawer);
+  if (phone) {
+    console.log(`[CRM] Step: Found in copyable spans: ${phone}`);
+    return phone;
   }
 
   console.log('[CRM] Step: No number found in copyable spans');
@@ -466,19 +653,43 @@ function _extractFromDrawerCopyableSpan() {
 }
 
 const DBG = true; // set to true to log paths
+
+/**
+ * Wait for the main chat area to be visible
+ */
+async function _waitForMainArea(maxWait = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    const main = document.querySelector('#main') || 
+                 document.querySelector('[data-testid="conversation-panel"]');
+    if (main && _isVisible(main)) {
+      console.log('[CRM] Main area is ready');
+      return main;
+    }
+    await _sleep(50);
+  }
+  console.log('[CRM] Main area not ready after wait');
+  return null;
+}
+
 /**
  * Aggregator with a short settle wait
  */
 async function extractPhoneNumber() {
   console.log('[CRM] Starting phone extraction');
+  
+  // Wait for main area to be ready first
+  await _waitForMainArea(1500);
+  
   // Prioritize left pane and non-drawer sources first
   let n =
     _extractFromDataAttrs() ||
     // _extractFromLeftPaneSelected() ||
-    _extractFromHeaderTel() ||
-    _extractFromHeaderAria() ||
-    _extractFromHeaderText() ||
-    _extractFromUrl();
+    // _extractFromHeaderTel() ||
+    // _extractFromHeaderAria() ||
+    _extractFromHeaderSubtitle();  // NEW: Try subtitle/secondary text
+    //_extractFromHeaderText();
+    // _extractFromUrl();
   if (_hasMinLen(n)) {
     console.log(`[CRM] Extraction complete (non-drawer): ${n}`);
     return _onlyDigits(n);
@@ -489,10 +700,11 @@ async function extractPhoneNumber() {
   if (_hasLidContext()) {
     // Quick wins first (sometimes header shows the phone)
     n =
-      _extractFromHeaderTel() ||
-      _extractFromHeaderAria() ||
-      _extractFromHeaderText() ||
-      _extractFromUrl();
+      // _extractFromHeaderTel() ||
+      _extractFromHeaderSubtitle();  // NEW: Try subtitle for saved contacts
+      // _extractFromHeaderAria()
+      // _extractFromHeaderText();
+      // _extractFromUrl();
     // _extractFromLeftPaneSelected();
     if (DBG) console.debug('[CRM] extracted via <PATH>', n);
     if (_hasMinLen(n)) {
@@ -523,10 +735,11 @@ async function extractPhoneNumber() {
   // Non-LID path (regular personal accounts)
   n =
     _extractFromDataAttrs() ||
-    _extractFromHeaderTel() ||
-    _extractFromHeaderAria() ||
-    _extractFromHeaderText() ||
-    _extractFromUrl();
+    // _extractFromHeaderTel() ||
+    _extractFromHeaderSubtitle();  // NEW: Try subtitle for saved contacts
+    // _extractFromHeaderAria();
+    // _extractFromHeaderText() ||
+    // _extractFromUrl();
   // _extractFromLeftPaneSelected();
   if (_hasMinLen(n)) {
     console.log(`[CRM] Extraction complete (non-LID quick): ${n}`);
@@ -538,10 +751,11 @@ async function extractPhoneNumber() {
   while (Date.now() < deadline) {
     n =
       _extractFromDataAttrs() ||
-      _extractFromHeaderTel() ||
-      _extractFromHeaderAria() ||
-      _extractFromHeaderText() ||
-      _extractFromUrl();
+      _extractFromHeaderSubtitle();  // NEW: Try subtitle for saved contacts
+      // _extractFromHeaderTel() ||
+      // _extractFromHeaderAria() ||
+      // _extractFromHeaderText();
+      // _extractFromUrl();
     // _extractFromLeftPaneSelected();
     if (_hasMinLen(n)) {
       console.log(`[CRM] Extraction complete (settle loop): ${n}`);
