@@ -34,6 +34,7 @@
                 "https://web.whatsapp.com/"
             ],
             "js": [
+                "phoneExtractor.js",
                 "content.js"
             ],
             "css": [
