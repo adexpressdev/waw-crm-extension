@@ -6,6 +6,13 @@ let dashboardWindowId = null
 
 // --- CONFIGURATION ---
 const { SPREADSHEET_ID, SHEET_NAME, PHONE_COLUMN_RANGE } = CONFIG
+
+// --- AWAJ DIGITAL VOICE BROADCAST CONFIG ---
+const AWAJ_API_BASE = 'https://api.awajdigital.com/api'
+const AWAJ_STATUS_VOICE_MAP = {
+  'Waiting for approval': CONFIG.AWAJ_DIGITAL_VOICE_FOR_WAITING_FOR_APPROVAL,
+  'Code Pending...': CONFIG.AWAJ_DIGITAL_VOICE_FOR_CODE_PENDING,
+}
 // --- SIMPLE IN-MEMORY CACHE FOR PHONE COLUMN (M) ---
 let cachedPhoneColumn = null; // { values: [...], fetchedAt: timestamp }
 const PHONE_CACHE_TTL_MS = 15000; // reuse column for up to 15 seconds
@@ -29,6 +36,65 @@ function getAuthToken() {
 // --- UTILITY TO CONVERT COLUMN INDEX TO LETTER ---
 function columnToLetter(column) {
   return String.fromCharCode(65 + parseInt(column));
+}
+
+// --- AWAJ DIGITAL BROADCAST HELPER ---
+/**
+ * Sends a voice broadcast via AwajDigital API when status changes to a trigger status.
+ * @param {string} phoneDigits - Full phone digits from sheet (e.g. "8801722626327")
+ * @param {string} newStatus - The new status value (e.g. "Waiting for approval")
+ */
+async function triggerAwajBroadcast(phoneDigits, newStatus) {
+  const voiceName = AWAJ_STATUS_VOICE_MAP[newStatus]
+  if (!voiceName) {
+    console.log(`[AWAJ] No voice mapped for status "${newStatus}", skipping broadcast`)
+    return
+  }
+
+  // Convert 880XXXXXXXXXX to 0XXXXXXXXXX (BD local format required by API)
+  let localPhone = phoneDigits.replace(/\D/g, '')
+  if (localPhone.startsWith('880')) {
+    localPhone = '0' + localPhone.slice(3)
+  } else if (!localPhone.startsWith('0')) {
+    localPhone = '0' + localPhone
+  }
+
+  // Validate BD phone format: 01XXXXXXXXX (11 digits)
+  if (!/^01\d{9}$/.test(localPhone)) {
+    console.error(`[AWAJ] Invalid BD phone number: ${localPhone} (from ${phoneDigits})`)
+    return
+  }
+
+  const requestId = crypto.randomUUID()
+
+  console.log(`[AWAJ] Sending broadcast to ${localPhone} with voice "${voiceName}" for status "${newStatus}"`)
+
+  try {
+    const response = await fetch(`${AWAJ_API_BASE}/broadcasts`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.AWAJ_DIGITAL_API_KEY}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        request_id: requestId,
+        voice: voiceName,
+        sender: CONFIG.AWAJ_DIGITAL_SENDER,
+        phone_numbers: [localPhone]
+      })
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      console.log(`[AWAJ] Broadcast created successfully:`, data.broadcast)
+    } else {
+      console.error(`[AWAJ] Broadcast failed:`, data.message || data)
+    }
+  } catch (err) {
+    console.error(`[AWAJ] Network error sending broadcast:`, err)
+  }
 }
 
 
@@ -271,6 +337,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         console.log('[BACKGROUND] All updates were successful.');
         sendResponse({ success: true });
+
+        // --- AWAJ DIGITAL BROADCAST: Fire voice call on specific status changes ---
+        if (parseInt(request.columnIndex) === 0 && AWAJ_STATUS_VOICE_MAP[request.newValue]) {
+          console.log(`[AWAJ] Status changed to "${request.newValue}", fetching phone for row ${request.rowIndex}`)
+          try {
+            // Read column M (phone) for this row
+            const phoneRange = `'${SHEET_NAME}'!M${request.rowIndex}`
+            const phoneResp = await fetch(
+              `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(phoneRange)}`,
+              { headers: { 'Authorization': `Bearer ${token}` } }
+            )
+            const phoneData = await phoneResp.json()
+            const phoneValue = phoneData.values?.[0]?.[0]
+            if (phoneValue) {
+              triggerAwajBroadcast(phoneValue, request.newValue)
+            } else {
+              console.warn(`[AWAJ] No phone number in column M for row ${request.rowIndex}`)
+            }
+          } catch (awajErr) {
+            console.error('[AWAJ] Error reading phone for broadcast:', awajErr)
+          }
+        }
 
       } catch (error) {
         console.error('[BACKGROUND] A critical update error occurred:', error);

@@ -11,7 +11,12 @@ const CONFIG = {
     // Derived configuration
     get PHONE_COLUMN_RANGE() {
         return `'${this.SHEET_NAME}'!M:M`;
-    }
+    },
+
+    AWAJ_DIGITAL_API_KEY: "oat_MTcx.LV90UzVvZ3VsM3pQR1NCUVp0Mk5LSm15SGdlRXFNVDVaQ3hiVWxIVTEyNDM0ODE2MjI",
+    AWAJ_DIGITAL_SENDER: '09606990198',
+    AWAJ_DIGITAL_VOICE_FOR_WAITING_FOR_APPROVAL: 'welcome',
+    AWAJ_DIGITAL_VOICE_FOR_CODE_PENDING: 'welcome',
 };
 
 // Export for use in other modules

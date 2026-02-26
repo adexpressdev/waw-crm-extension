@@ -472,78 +472,62 @@ function _isDrawerOpen() {
 function _extractPhoneFromDrawerSection(drawer) {
     if (!drawer) return null
 
-    // PRIMARY: Target the subtitle div that contains phone (div.x1evy7pa.x1anpbxc)
-    const subtitleDivs = drawer.querySelectorAll('div.x1evy7pa.x1anpbxc')
-    console.log(`[CRM] Step: Found ${subtitleDivs.length} subtitle divs in drawer`)
-
-    for (const div of subtitleDivs) {
-        if (!_isVisible(div)) continue
-
-        // Look for copyable-text spans with selectable-text testid
-        const copyableSpans = div.querySelectorAll('span.copyable-text[data-testid="selectable-text"], span._ao3e._aupe.copyable-text')
-        for (const span of copyableSpans) {
-            const txt = (span.textContent || '').trim()
-            console.log(`[CRM] Step: Checking subtitle copyable span: "${txt}"`)
-
-            const phones = _findBdPhonesInText(txt)
-            if (phones.length > 0) {
-                console.log(`[CRM] Step: Found phone in subtitle: ${phones[0]}`)
-                return phones[0]
-            }
+    // Scan the entire right-panel container, not just the sub-element returned by
+    // _isDrawerOpen(), because the phone text may live anywhere inside the panel.
+    // Walk up to find the widest enclosing panel (aside, div[role], etc.).
+    const root = (() => {
+        let el = drawer
+        // Walk up until we hit a known panel boundary or document
+        for (let i = 0; i < 8; i++) {
+            const p = el.parentElement
+            if (!p || p === document.body) break
+            const tag = p.tagName?.toLowerCase()
+            const role = p.getAttribute?.('role')
+            if (tag === 'aside' || role === 'region' || role === 'dialog') { el = p; break }
+            el = p
         }
+        return el
+    })()
+    console.log(`[CRM] Step: Scanning drawer root: ${root.tagName}.${[...root.classList].join('.')}`)
 
-        // Also check nested spans
-        const allSpans = div.querySelectorAll('span')
-        for (const span of allSpans) {
-            const txt = (span.textContent || '').trim()
-            if (!txt || txt.length < 8 || !txt.match(/[\d\+]/)) continue
-
+    // PRIMARY: All copyable-text and selectable-text elements (WhatsApp's standard)
+    const copyableSelectors = [
+        'span.copyable-text[data-testid="selectable-text"]',
+        '[data-testid="selectable-text"].copyable-text',
+        'span.copyable-text',
+        '.copyable-text'
+    ]
+    for (const sel of copyableSelectors) {
+        const elements = root.querySelectorAll(sel)
+        console.log(`[CRM] Step: Checking ${elements.length} elements for selector "${sel}"`)
+        for (const el of elements) {
+            if (!_isVisible(el)) continue
+            const txt = (el.textContent || '').trim()
+            if (!txt || txt.length < 8) continue
             const phones = _findBdPhonesInText(txt)
             if (phones.length > 0) {
-                console.log(`[CRM] Step: Found phone in subtitle nested span: ${phones[0]}`)
+                console.log(`[CRM] Step: Found phone in copyable element: ${phones[0]}`)
                 return phones[0]
             }
         }
     }
 
-    // SECONDARY: All copyable-text elements in drawer
-    const allCopyable = drawer.querySelectorAll('[data-testid="selectable-text"].copyable-text, span.copyable-text._ao3e._aupe')
-    console.log(`[CRM] Step: Checking ${allCopyable.length} copyable elements in drawer`)
-
-    for (const el of allCopyable) {
-        if (!_isVisible(el)) continue
-        const txt = (el.textContent || '').trim()
-        if (!txt || txt.length < 8) continue
-
-        const phones = _findBdPhonesInText(txt)
-        if (phones.length > 0) {
-            console.log(`[CRM] Step: Found phone in drawer copyable: ${phones[0]}`)
+    // SECONDARY: Text walker over every visible text node in the panel
+    console.log('[CRM] Step: Running text walker over entire drawer root')
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+    let node
+    while ((node = walker.nextNode())) {
+        if (!node.parentElement || !_isVisible(node.parentElement)) continue
+        const t = (node.nodeValue || '').trim()
+        if (!t || t.length < 8 || !t.match(/[\d\+]/)) continue
+        const phones = _findBdPhonesInText(t)
+        if (phones.length) {
+            console.log(`[CRM] Step: Found BD phone via text walker: "${t}" => ${phones[0]}`)
             return phones[0]
         }
     }
 
-    // FALLBACK: Text walker for any phone-like content
-    const walker = document.createTreeWalker(drawer, NodeFilter.SHOW_TEXT, null)
-    let node
-    const foundPhones = []
-
-    while ((node = walker.nextNode())) {
-        if (!node.parentElement || !_isVisible(node.parentElement)) continue
-        const t = node.nodeValue?.trim()
-        if (!t || t.length < 8 || !t.match(/[\d\+]/)) continue
-
-        const phones = _findBdPhonesInText(t)
-        if (phones.length) {
-            console.log('[CRM] Step: drawer text walker -> BD phones:', t, '=>', phones)
-            foundPhones.push(...phones)
-        }
-    }
-
-    if (foundPhones.length) {
-        console.log(`[CRM] Step: Found ${foundPhones.length} phones via text walker, using first: ${foundPhones[0]}`)
-        return foundPhones[0]
-    }
-
+    console.log('[CRM] Step: No BD phone found anywhere in drawer')
     return null
 }
 
@@ -557,14 +541,21 @@ async function _extractFromInfoDrawer({ aggressive = false } = {}) {
     if (!drawer) {
         console.log('[CRM] Step: Drawer not open, attempting to click header to open')
 
-        // Try multiple selectors to find clickable header element
+        // Click the contact name / avatar area to open "Contact info" drawer.
+        // IMPORTANT: Do NOT target generic buttons — the first button in #main header
+        // is the Search button which opens "Search messages" instead.
         const headerSelectors = [
-            '#main header [role="button"]',
-            '#main header img[draggable="false"]', // Profile image in header
+            // Best: the dedicated info-header clickable region
+            '[data-testid="conversation-info-header"]',
+            '#main header [data-testid="conversation-info-header-chat-title"]',
             '#main header span[data-testid="conversation-info-header-chat-title"]',
-            '#main header',
-            '[data-testid="conversation-header"]',
-            '[data-testid="conversation-info-header"]'
+            // Avatar / profile image
+            '#main header [data-testid="default-user"]',
+            '#main header img[draggable="false"]',
+            // Role=button on the name/contact area (not the icon buttons on the right)
+            '#main header [role="button"]:first-of-type',
+            // Whole header as last resort (WhatsApp handles click → contact info)
+            '#main header'
         ]
 
         let headerClickable = null
@@ -589,12 +580,29 @@ async function _extractFromInfoDrawer({ aggressive = false } = {}) {
             return null
         }
 
+        const dispatchTrustedLikeClick = (el) => {
+            if (!el) return false
+            // Dispatch directly on the found element — do NOT walk up to a parent button,
+            // because walking up from the contact-name area could land on the Search/Menu button.
+            try {
+                el.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+                el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+                el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+                el.click?.()
+                return true
+            } catch (e) {
+                console.log('[CRM] Step: Click dispatch failed:', e)
+                return false
+            }
+        }
+
         console.log(`[CRM] Step: Clicking header element: ${headerClickable.tagName}`)
-        headerClickable.click()
+        dispatchTrustedLikeClick(headerClickable)
         openedHere = true
 
         // Wait for drawer to appear and render (up to ~2s for aggressive, ~1s normal)
-        const spins = aggressive ? 30 : 15
+        const spins = aggressive ? 36 : 18
         for (let i = 0; i < spins; i++) {
             await _sleep(70)
             drawer = _isDrawerOpen()
@@ -603,6 +611,12 @@ async function _extractFromInfoDrawer({ aggressive = false } = {}) {
                 // Give it a moment to fully render content
                 await _sleep(150)
                 break
+            }
+
+            // Retry click once midway if still closed (WhatsApp UI can be racey)
+            if (i === Math.floor(spins / 2)) {
+                console.log('[CRM] Step: Drawer still closed, retrying header click')
+                dispatchTrustedLikeClick(headerClickable)
             }
         }
     }
@@ -615,16 +629,7 @@ async function _extractFromInfoDrawer({ aggressive = false } = {}) {
     // 2) Extract phone from drawer
     const phone = _extractPhoneFromDrawerSection(drawer)
 
-    // 3) Close drawer if we opened it
-    if (openedHere) {
-        console.log('[CRM] Step: Closing drawer (opened here)')
-        const closeBtn =
-            document.querySelector('button[aria-label="Close"]') ||
-            document.querySelector('[data-testid="x-view"]') ||
-            document.querySelector('button[aria-label="Back"]') ||
-            drawer.querySelector('button[type="button"]') // Close button in header
-        closeBtn?.click()
-    }
+    // Drawer is intentionally left open after extraction
 
     if (phone) {
         console.log(`[CRM] Step: Extracted from drawer: ${phone}`)
@@ -688,45 +693,21 @@ async function extractPhoneNumber() {
 
     await _waitForMainArea(1500)
 
-    // let n = _extractFromHeaderSubtitle()
-    // if (_hasMinLen(n)) {
-    //     console.log(`[CRM] Extraction complete in _extractFromHeaderSubtitle: ${n}`)
-    //     return _onlyDigits(n)
-    // }
+    let n = null
 
-    // If no contact found in left pane or quick sources, fall back to drawer/sidebar
-    console.log('[CRM] Searching in drawer/sidebar...')
-    // If this is a LID (business) chat, don't trust data-* numbers — open the drawer early.
-    if (_hasLidContext()) {
-        n = await _extractFromInfoDrawer({ aggressive: true })
-        if (DBG) console.debug('[CRM] extracted via <PATH>', n)
-        // Some builds only render the phone as plain text copyable row
-        if (!_hasMinLen(n)) {
-            n = _extractFromDrawerCopyableSpan()
-        }
-        if (_hasMinLen(n)) {
-            console.log(`[CRM] Extraction complete (LID drawer): ${n}`)
-            return _onlyDigits(n)
-        }
-        // As a last resort, try URL/left pane again
-        // n = _extractFromUrl() || _extractFromLeftPaneSelected()
-        n = _extractFromUrl()
-        if (_hasMinLen(n)) {
-            console.log(`[CRM] Extraction complete (LID last resort): ${n}`)
-            return _onlyDigits(n)
-        }
-        console.log('[CRM] Extraction failed (LID)')
-        return null
+    // Drawer-only extraction: open drawer, extract phone, leave drawer open
+    console.log('[CRM] Opening drawer for extraction...')
+    const isLid = _hasLidContext()
+    n = await _extractFromInfoDrawer({ aggressive: isLid })
+    if (!_hasMinLen(n)) {
+        n = _extractFromDrawerCopyableSpan()
     }
-
-    // Non-LID path (regular personal accounts)
-    n = _extractFromHeaderSubtitle()  // Try subtitle for saved contacts
     if (_hasMinLen(n)) {
-        console.log(`[CRM] Extraction complete (non-LID quick): ${n}`)
+        console.log(`[CRM] Extraction complete (drawer): ${n}`)
         return _onlyDigits(n)
     }
 
-    console.log('[CRM] Extraction failed completely')
+    console.log('[CRM] Extraction failed: no phone found in drawer')
     return null
 }
 

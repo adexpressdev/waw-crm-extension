@@ -17,7 +17,8 @@
     },
     "host_permissions": [
         "https://sheets.googleapis.com/",
-        "https://web.whatsapp.com/*"
+        "https://web.whatsapp.com/*",
+        "https://api.awajdigital.com/*"
     ],
     "oauth2": {
         "client_id": "851591119047-cb5o2v87ccqqepnmffbrobrb8ihmn0g6.apps.googleusercontent.com",
